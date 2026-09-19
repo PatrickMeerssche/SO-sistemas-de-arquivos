@@ -35,12 +35,14 @@
 *.i*86
 *.x86_64
 *.hex
+/fs
 
-# Debug files
+# Debug files/folders
 *.dSYM/
 *.su
 *.idb
 *.pdb
+.temp/
 
 # Kernel Module Compile Results
 *.mod*
@@ -53,3 +55,5 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+disk/disk_storage
