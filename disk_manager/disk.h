@@ -1,28 +1,22 @@
 #ifndef DISK_H
 #define DISK_H
 
-// Camada mais baixa do sistema de arquivos: trata a imagem de disco como um
-// vetor de blocos de tamanho fixo, mapeada em memoria (mmap) a partir de um
-// arquivo comum, para que as alteracoes possam ser persistidas em disco.
+#include <stdint.h>
+#include <fs_types.h>
 
-#include "fs_types.h"
-
-// Abre (ou cria) a imagem de disco em `path`. Se o arquivo ainda nao existe
-// ou tem o tamanho errado, ele e (re)criado com exatamente DISK_SIZE bytes
-// zerados de verdade e formatado com um sistema de arquivos novo. Retorna 0
-// em caso de sucesso, -1 em caso de falha.
+// Mounts the disk image at the specified path. If the file does not exist or has an incorrect size, 
+// it is created and formatted as a new filesystem. If it exists and is valid, it is mounted for use,
+// maintaining the existing data. Returns 0 on success, -1 on failure. 
 int disk_mount(const char *path);
 
-// Persiste as alteracoes pendentes em disco (msync) e desfaz o mapeamento.
+// Unmounts the disk image by synchronizing any pending changes, unmapping the memory, and closing the file descriptor.
 void disk_unmount(void);
 
-// Persiste as alteracoes pendentes em disco sem desmontar.
+// Synchronizes the disk image by persisting any pending changes to the underlying file.
 void disk_sync(void);
 
-// Ponteiro para os bytes crus do bloco `block_num` dentro da imagem mapeada.
+// Pointers to the structures within the memory-mapped disk image.
 uint8_t *disk_block_ptr(uint32_t block_num);
-
-// Acessos convenientes para as regioes conhecidas da imagem de disco.
 superblock_t *disk_superblock(void);
 uint8_t *disk_block_bitmap(void);
 uint8_t *disk_inode_bitmap(void);

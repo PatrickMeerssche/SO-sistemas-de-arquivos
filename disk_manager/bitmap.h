@@ -1,19 +1,16 @@
 #ifndef BITMAP_H
 #define BITMAP_H
 
-// Utilitario simples de bitmap, usado para controlar quais blocos/i-nodes
-// estao livres ou ocupados. Opera direto sobre um buffer de bytes (em geral
-// um ponteiro dentro da imagem de disco mapeada em memoria), um bit por
-// bloco/i-node.
-
 #include <stdint.h>
 
-int bitmap_test(const uint8_t *bitmap, uint32_t bit);
+// Sets the bit at the given index to 1 (marking it as used).
 void bitmap_set(uint8_t *bitmap, uint32_t bit);
+
+// Clears the bit at the given index to 0 (marking it as free).
 void bitmap_clear(uint8_t *bitmap, uint32_t bit);
 
-// Retorna o indice do primeiro bit livre em [0, total_bits), ou -1 se o
-// bitmap estiver completamente cheio.
+// Finds the index of the first free bit (0) in the bitmap within the range [0, total_bits).
+// Returns the index of the first free bit, or -1 if the bitmap is completely full.
 int32_t bitmap_find_first_free(const uint8_t *bitmap, uint32_t total_bits);
 
 #endif

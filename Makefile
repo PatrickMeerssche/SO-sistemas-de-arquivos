@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -g -I.
-TARGET = fs
+TARGET = filesystem
 
 SRCS = main.c \
        disk_manager/bitmap.c \

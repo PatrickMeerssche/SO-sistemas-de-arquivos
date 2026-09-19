@@ -8,33 +8,39 @@
 #include <stdlib.h>
 #include <string.h>
 
+// The maximum length of a command line input, including the command and its arguments.
 #define MAX_LINE_LEN 1024
 
-// Imprime exatamente a lista de comandos exigida pelo trabalho.
+// Print the help message with the list of available commands.
 static void print_help(void) {
-    printf("Comandos disponiveis:\n");
-    printf("  touch <arquivo>                  cria um arquivo vazio\n");
-    printf("  rm <arquivo>                     remove um arquivo\n");
-    printf("  echo \"texto\" > <arquivo>         cria/sobrescreve arquivo com texto\n");
-    printf("  echo \"texto\" >> <arquivo>        cria/acrescenta texto ao arquivo\n");
-    printf("  cat <arquivo>                    mostra o conteudo de um arquivo\n");
-    printf("  cp <origem> <destino>            copia um arquivo\n");
-    printf("  mv <origem> <destino>            renomeia/move arquivo ou diretorio\n");
-    printf("  ln -s <alvo> <link>              cria um link simbolico\n");
-    printf("  mkdir <diretorio>                cria um diretorio\n");
-    printf("  rmdir <diretorio>                remove um diretorio vazio\n");
-    printf("  ls [diretorio]                   lista o conteudo de um diretorio\n");
-    printf("  cd <diretorio>                   troca de diretorio atual\n");
-    printf("  pwd                              mostra o diretorio atual\n");
-    printf("  exit | quit                      encerra o programa\n");
+    printf("Available commands:\n");
+    printf("  touch <file>                  Create an empty file\n");
+    printf("  rm <file>                     Remove a file\n");
+    printf("  echo \"text\" > <file>          Create/overwrite a file with text\n");
+    printf("  echo \"text\" >> <file>         Create/append text to a file\n");
+    printf("  cat <file>                    Read the content of a file\n");
+    printf("  cp <source> <destination>     Copy a file\n");
+    printf("  mv <source> <destination>     Rename/move a file or directory\n");
+    printf("  ln -s <target> <link>         Create a symbolic link for a file or directory\n");
+    printf("  mkdir <directory>             Create a directory\n");
+    printf("  rmdir <directory>             Remove an empty directory\n");
+    printf("  ls <directory>                List the contents of a directory\n");
+    printf("  cd <directory>                Change the current directory\n");
+    printf("  pwd                           Show the current directory\n");
+    printf("  exit | quit                   Exit the program\n");
 }
 
-// Interpreta "echo <conteudo> > <caminho>" / "echo <conteudo> >> <caminho>",
-// onde `args` e tudo o que vem depois da palavra "echo". O conteudo pode
-// opcionalmente vir entre aspas duplas. Retorna 0 em caso de sucesso, -1 se
-// nenhum operador de redirecionamento for encontrado.
-static int parse_echo(const char *args, char *content, size_t content_sz,
-                       char *path, size_t path_sz, int *append) {
+/* Parse the arguments of an echo command, extracting the content to write, the target file path, and whether to append or overwrite.
+ *      Args:
+ *          args: the string containing everything after the "echo" command.
+ *          content: buffer to store the extracted content.
+ *          content_sz: size of the content buffer.
+ *          path: buffer to store the extracted file path.
+ *          path_sz: size of the path buffer.
+ *          append: pointer to store whether to append (1) or overwrite (0).
+ *      Returns 0 on success, -1 if no redirection operator is found.
+ */
+static int parse_echo(const char *args, char *content, size_t content_sz, char *path, size_t path_sz, int *append) {
     const char *op = strstr(args, ">>");
     int op_len = 2;
     if (op == NULL) {
@@ -46,7 +52,7 @@ static int parse_echo(const char *args, char *content, size_t content_sz,
     }
     *append = (op_len == 2);
 
-    // conteudo = tudo antes do operador, sem espacos nas pontas e sem aspas
+    // content = everything before the operator, without trailing spaces and without surrounding quotes  
     int clen = (int)(op - args);
     while (clen > 0 && args[clen - 1] == ' ') {
         clen--;
@@ -69,7 +75,7 @@ static int parse_echo(const char *args, char *content, size_t content_sz,
     memcpy(content, args + cstart, (size_t)outlen);
     content[outlen] = '\0';
 
-    // caminho = tudo depois do operador, sem espacos nas pontas
+    // path = everything after the operator, without trailing spaces
     const char *p = op + op_len;
     while (*p == ' ') {
         p++;
@@ -86,6 +92,7 @@ static int parse_echo(const char *args, char *content, size_t content_sz,
     return 0;
 }
 
+// Run the interactive loop (read command, execute, show result) until the user types "exit"/"quit" or closes the standard input.
 void shell_run(void) {
     char user[MAX_USER_LEN];
     const char *env_user = getenv("USER");
@@ -96,13 +103,14 @@ void shell_run(void) {
     char line[MAX_LINE_LEN];
     char prompt_path[MAX_PATH_LEN];
 
-    printf("Mini sistema de arquivos baseado em i-nodes. Digite 'help' para ajuda.\n");
-
+    printf("Filesystem shell started. Type 'help' for a list of commands.\n");
     for (;;) {
+        // Display the prompt with the current user and directory
         path_absolute(cwd, prompt_path, sizeof(prompt_path));
         printf("%s:%s$ ", user, prompt_path);
         fflush(stdout);
 
+        // Read a line of input from the user
         if (fgets(line, sizeof(line), stdin) == NULL) {
             printf("\n");
             break;
@@ -112,7 +120,7 @@ void shell_run(void) {
             line[len - 1] = '\0';
         }
 
-        // separa a palavra do comando, mantendo o resto como texto bruto de argumentos
+        // Skip leading spaces and extract the command and its arguments
         char *p = line;
         while (*p == ' ') {
             p++;
@@ -136,6 +144,7 @@ void shell_run(void) {
         }
         const char *args = p;
 
+        // Execute the command based on the parsed input
         if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0) {
             break;
         } else if (strcmp(cmd, "help") == 0) {
@@ -164,35 +173,28 @@ void shell_run(void) {
             char a[MAX_PATH_LEN], b[MAX_PATH_LEN];
             if (sscanf(args, "%511s %511s", a, b) == 2) {
                 fs_cp(cwd, a, b, user);
-            } else {
-                printf("uso: cp <origem> <destino>\n");
             }
         } else if (strcmp(cmd, "mv") == 0) {
             char a[MAX_PATH_LEN], b[MAX_PATH_LEN];
             if (sscanf(args, "%511s %511s", a, b) == 2) {
                 fs_mv(cwd, a, b, user);
-            } else {
-                printf("uso: mv <origem> <destino>\n");
             }
         } else if (strcmp(cmd, "ln") == 0) {
             char flag[16], a[MAX_PATH_LEN], b[MAX_PATH_LEN];
             if (sscanf(args, "%15s %511s %511s", flag, a, b) == 3 && strcmp(flag, "-s") == 0) {
                 fs_ln(cwd, a, b, user);
-            } else {
-                printf("uso: ln -s <alvo> <link>\n");
             }
         } else if (strcmp(cmd, "echo") == 0) {
             char content[MAX_LINE_LEN], target_path[MAX_PATH_LEN];
             int append;
             if (parse_echo(args, content, sizeof(content), target_path, sizeof(target_path), &append) == 0) {
                 fs_write_content(cwd, target_path, content, append, user);
-            } else {
-                printf("uso: echo \"conteudo\" > arquivo   ou   echo \"conteudo\" >> arquivo\n");
             }
         } else {
-            printf("comando desconhecido: %s (digite 'help')\n", cmd);
+            printf("Unknown command: %s (type 'help' for a list of commands)\n", cmd);
         }
 
-        disk_sync(); // persiste as alteracoes apos cada comando
+        // Ensure that all changes are written to disk after each command execution
+        disk_sync(); 
     }
 }

@@ -55,5 +55,3 @@ dkms.conf
 
 # debug information files
 *.dwo
-
-disk/disk_storage

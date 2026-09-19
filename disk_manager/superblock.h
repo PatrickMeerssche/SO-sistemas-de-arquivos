@@ -1,8 +1,7 @@
 #ifndef SUPERBLOCK_H
 #define SUPERBLOCK_H
 
-// Calcula o layout em disco, zera os bitmaps/tabela de i-nodes e cria o
-// diretorio raiz. Chamada apenas uma vez, quando a imagem e nova.
+// Format the disk with a new filesystem, initializing the superblock, bitmaps, and inode table.
 void superblock_format(void);
 
 #endif

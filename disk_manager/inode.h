@@ -1,38 +1,29 @@
 #ifndef INODE_H
 #define INODE_H
 
-// Alocacao de i-nodes e blocos de dados. Tanto arquivos quanto diretorios
-// sao apenas "i-nodes com conteudo", entao a mesma logica de encadeamento
-// de blocos e compartilhada por ambos.
-
 #include "fs_types.h"
 
-// Aloca um i-node livre, zera seu conteudo e o marca como usado. Retorna seu
-// indice, ou -1 se nao houver mais i-nodes livres.
+// Allocates a free inode, zeros its content, and marks it as used. Returns its index, or -1 if there are no more free inodes.
 int32_t inode_alloc(void);
 
-// Libera todos os blocos de dados pertencentes ao i-node e depois marca o
-// proprio i-node como livre novamente.
+// Frees all data blocks belonging to the inode and then marks the inode itself as free again.
 void inode_free(uint32_t idx);
 
-// Ponteiro para a posicao do i-node `idx` na tabela de i-nodes em disco.
-inode_t *inode_get(uint32_t idx);
-
-// Aloca um bloco de dados livre, zera seu conteudo e o marca como usado.
-// Retorna o numero do bloco, ou INVALID_BLOCK se o disco estiver cheio.
+// Allocates a free data block and zeros its content. Returns the block number, or INVALID_BLOCK if there are no more free blocks.
 uint32_t block_alloc(void);
+
+// Frees a data block, marking it as free in the bitmap and incrementing the count of free blocks in the superblock.
 void block_free(uint32_t block_num);
 
-// Retorna o numero do bloco que guarda o `logical_index`-esimo bloco do
-// conteudo de um i-node (a partir de 0). Blocos alem de DIRECT_BLOCKS sao
-// alcancados seguindo a cadeia de i-nodes de continuacao apontada por
-// `next_inode`. Se `allocate` for diferente de zero, blocos/i-nodes de
-// continuacao faltantes sao criados conforme necessario; caso contrario,
-// blocos faltantes retornam INVALID_BLOCK.
+// Returns the block number that holds the `logical_index`-th block of an inode's content (starting from 0). 
+// Blocks beyond DIRECT_BLOCKS are accessed by following the chain of continuation inodes pointed to by `next_inode`.
+// If `allocate` is non-zero, missing blocks/continuation inodes are created as needed; otherwise, missing blocks return INVALID_BLOCK.
 uint32_t inode_get_block(inode_t *inode, uint32_t logical_index, int allocate);
 
-// Libera todos os blocos de dados (e eventuais i-nodes de continuacao) de
-// `inode`, deixando seu conteudo vazio (size volta a 0).
+// Frees all data blocks (and any continuation inodes) of `inode`, leaving its content empty (size becomes 0).
 void inode_truncate(inode_t *inode);
+
+// Returns a pointer to the position of the inode `idx` in the inode table on disk.
+inode_t *inode_get(uint32_t idx);
 
 #endif
