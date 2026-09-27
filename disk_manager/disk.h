@@ -2,7 +2,7 @@
 #define DISK_H
 
 #include <stdint.h>
-#include <fs_types.h>
+#include "fs_types.h"
 
 // Mounts the disk image at the specified path. If the file does not exist or has an incorrect size, 
 // it is created and formatted as a new filesystem. If it exists and is valid, it is mounted for use,

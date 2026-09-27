@@ -55,3 +55,6 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# disk image (large binary, do not track)
+disk/disk_storage
