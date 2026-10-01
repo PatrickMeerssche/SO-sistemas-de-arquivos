@@ -43,6 +43,7 @@
 *.idb
 *.pdb
 .temp/
+.vscode/
 
 # Kernel Module Compile Results
 *.mod*
