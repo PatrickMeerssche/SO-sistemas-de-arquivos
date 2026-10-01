@@ -10,8 +10,9 @@
 #include <string.h>
 #include <time.h>
 
-// ---- pequenos auxiliares locais para mover bytes de/para os blocos de um i-node ----
-
+// Write `data` of length `len` to the file represented by `inode_idx`.
+// If `append` is non-zero, the data is appended to the end of the file; otherwise, the file is truncated before writing.
+// Returns 0 on success, -1 on failure (e.g., disk full).
 static int file_write(uint32_t inode_idx, const char *data, size_t len, int append) {
     inode_t *inode = inode_get(inode_idx);
     uint32_t start_offset;
@@ -19,7 +20,7 @@ static int file_write(uint32_t inode_idx, const char *data, size_t len, int appe
     if (append) {
         start_offset = inode->size;
     } else {
-        inode_truncate(inode); // "echo >" substitui o conteudo anterior
+        inode_truncate(inode); // truncate the file to zero length
         start_offset = 0;
     }
 
@@ -30,7 +31,7 @@ static int file_write(uint32_t inode_idx, const char *data, size_t len, int appe
     while (written < len) {
         uint32_t blk = inode_get_block(inode, logical, 1);
         if (blk == INVALID_BLOCK) {
-            return -1; // disco cheio
+            return -1; // disk full or allocation failed
         }
         uint8_t *ptr = disk_block_ptr(blk);
         size_t space = BLOCK_SIZE - offset_in_block;
@@ -46,6 +47,8 @@ static int file_write(uint32_t inode_idx, const char *data, size_t len, int appe
     return 0;
 }
 
+// Read the entire content of the file represented by `inode_idx` into a newly allocated buffer.
+// The buffer is null-terminated and its length is returned in `out_len`.
 static void file_read(uint32_t inode_idx, char **out_buf, size_t *out_len) {
     inode_t *inode = inode_get(inode_idx);
     *out_len = inode->size;
@@ -61,7 +64,7 @@ static void file_read(uint32_t inode_idx, char **out_buf, size_t *out_len) {
         if (blk != INVALID_BLOCK) {
             memcpy(*out_buf + copied, disk_block_ptr(blk), chunk);
         } else {
-            memset(*out_buf + copied, 0, chunk); // normalmente nao deveria acontecer
+            memset(*out_buf + copied, 0, chunk); // fill with zeros if block is not allocated
         }
         copied += chunk;
         remaining -= chunk;
@@ -70,8 +73,7 @@ static void file_read(uint32_t inode_idx, char **out_buf, size_t *out_len) {
     (*out_buf)[*out_len] = '\0';
 }
 
-// ---- operacoes publicas --------------------------------------------------
-
+// Create a new file or update the modification time of an existing file.
 int fs_touch(uint32_t cwd, const char *path, const char *user) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];
@@ -82,7 +84,7 @@ int fs_touch(uint32_t cwd, const char *path, const char *user) {
     }
 
     if (inode_idx != INVALID_INODE) {
-        inode_get(inode_idx)->modified_at = time(NULL); // como o touch de verdade
+        inode_get(inode_idx)->modified_at = time(NULL); // update modification time
         return 0;
     }
 
@@ -94,6 +96,7 @@ int fs_touch(uint32_t cwd, const char *path, const char *user) {
     return 0;
 }
 
+// Remove a file.
 int fs_rm(uint32_t cwd, const char *path, const char *user) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];
@@ -118,6 +121,7 @@ int fs_rm(uint32_t cwd, const char *path, const char *user) {
     return 0;
 }
 
+// Write `content` to the file at `path`, creating it if necessary. If `append` is non-zero, append to the file; otherwise, overwrite it.
 int fs_write_content(uint32_t cwd, const char *path, const char *content, int append, const char *user) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];
@@ -151,6 +155,7 @@ int fs_write_content(uint32_t cwd, const char *path, const char *content, int ap
     return 0;
 }
 
+// Display the content of the file at `path` to standard output.
 int fs_cat(uint32_t cwd, const char *path, const char *user) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];
@@ -179,6 +184,7 @@ int fs_cat(uint32_t cwd, const char *path, const char *user) {
     return 0;
 }
 
+// Copy the file from `src` to `dst`, creating `dst` if necessary. If `dst` is an existing directory, the source file is copied into that directory with the same name.
 int fs_cp(uint32_t cwd, const char *src, const char *dst, const char *user) {
     uint32_t src_idx, src_parent;
     char src_name[MAX_NAME_LEN];
@@ -224,6 +230,7 @@ int fs_cp(uint32_t cwd, const char *src, const char *dst, const char *user) {
     return 0;
 }
 
+// Move the file or directory from `src` to `dst`. If `dst` is an existing directory, the source is moved into that directory with the same name.
 int fs_mv(uint32_t cwd, const char *src, const char *dst, const char *user) {
     uint32_t src_idx, src_parent;
     char src_name[MAX_NAME_LEN];
@@ -243,7 +250,7 @@ int fs_mv(uint32_t cwd, const char *src, const char *dst, const char *user) {
         return -1;
     }
 
-    // mv para um diretorio existente mantem o nome original.
+    // If `dst` is an existing directory, move `src` into that directory with the same name.
     if (dst_idx != INVALID_INODE && inode_get(dst_idx)->type == INODE_DIR) {
         dst_parent = dst_idx;
         strncpy(dst_name, src_name, MAX_NAME_LEN - 1);
@@ -256,7 +263,7 @@ int fs_mv(uint32_t cwd, const char *src, const char *dst, const char *user) {
     uint32_t existing;
     int found = dir_find_entry(dst_parent, dst_name, &existing);
     if (found && existing == src_idx) {
-        return 0; // mesmo local e mesmo nome: nada a fazer
+        return 0; // nothing to do if moving to the same location
     }
     if (found) {
         printf("mv: %s: ja existe no destino\n", dst_name);
@@ -269,11 +276,12 @@ int fs_mv(uint32_t cwd, const char *src, const char *dst, const char *user) {
     inode_t *inode = inode_get(src_idx);
     strncpy(inode->name, dst_name, MAX_NAME_LEN - 1);
     inode->name[MAX_NAME_LEN - 1] = '\0';
-    inode->parent_inode = (int32_t)dst_parent; // mantem correta a resolucao de ".."/alvo de symlink
+    inode->parent_inode = (int32_t)dst_parent; // update parent inode
     inode->modified_at = time(NULL);
     return 0;
 }
 
+// Create a symbolic link named `linkname` pointing to `target`.
 int fs_ln(uint32_t cwd, const char *target, const char *linkname, const char *user) {
     uint32_t link_idx, link_parent;
     char link_name[MAX_NAME_LEN];
@@ -293,7 +301,7 @@ int fs_ln(uint32_t cwd, const char *target, const char *linkname, const char *us
         return -1;
     }
 
-    // O "conteudo" de um symlink e simplesmente o texto do caminho alvo.
+    // Write the target path into the link's content.
     if (file_write(new_idx, target, strlen(target), 0) != 0) {
         printf("ln: %s: disco cheio\n", linkname);
         return -1;

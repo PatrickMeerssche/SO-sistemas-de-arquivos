@@ -1,7 +1,13 @@
+// Define _POSIX_C_SOURCE 200809L to ensure that ftruncate() is available when compiling with -std=c11.
+//  This is necessary for truncating the disk image file to the correct size.
+#define _POSIX_C_SOURCE 200809L
+
 #include "disk.h"
 #include "superblock.h"
 #include "fs_types.h"
 
+#include <unistd.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,9 +15,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// Define _POSIX_C_SOURCE 200809L to ensure that ftruncate() is available when compiling with -std=c11.
-//  This is necessary for truncating the disk image file to the correct size.
-#define _POSIX_C_SOURCE 200809L
 
 /* Set up global variables for the disk image file descriptor and memory-mapped image.
  *      g_fd: file descriptor for the disk image file

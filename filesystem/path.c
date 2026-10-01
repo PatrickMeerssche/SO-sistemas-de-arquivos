@@ -6,13 +6,16 @@
 #include <stdio.h>
 #include <string.h>
 
+// Solve a path component by component, handling ".", "..", and symlinks.
+// The function returns the inode index of the final component, or INVALID_INODE if it doesn't exist.
+// It also returns the parent directory's inode index and the name of the final component.
 int path_split(const char *path, char comps[MAX_DEPTH][MAX_NAME_LEN]) {
     int count = 0;
     const char *p = path;
 
     while (*p != '\0' && count < MAX_DEPTH) {
         while (*p == '/') {
-            p++; // pula barras (tambem colapsa "//")
+            p++; // skip leading slashes
         }
         if (*p == '\0') {
             break;
@@ -32,10 +35,9 @@ int path_split(const char *path, char comps[MAX_DEPTH][MAX_NAME_LEN]) {
     return count;
 }
 
-// Segue uma cadeia de symlinks a partir de `link_idx`, resolvendo alvos
-// relativos em relacao ao proprio diretorio pai do link (comportamento
-// padrao de symlink). Retorna o i-node final que nao e um link, ou
-// INVALID_INODE em caso de link quebrado ou saltos demais (protecao contra loop).
+// Follow a chain of symlinks starting from `link_idx`, resolving relative targets
+// with respect to the link's parent directory. Returns the final inode that is not a link
+// or INVALID_INODE in case of a broken link or too many jumps (protection against loops).
 static uint32_t follow_link(uint32_t link_idx, int depth) {
     if (depth <= 0) {
         return INVALID_INODE;
@@ -66,6 +68,9 @@ static uint32_t follow_link(uint32_t link_idx, int depth) {
     return resolved;
 }
 
+// Resolve `path` (absolute if starting with '/', relative to `base_inode` otherwise).
+// Symlinks in intermediate components are always followed; the last component is only followed if `follow_final_link` is non-zero.
+// "." and ".." are treated specially.
 int path_resolve(const char *path, uint32_t base_inode, int follow_final_link,
                   uint32_t *out_inode, uint32_t *out_parent, char *out_name) {
     char comps[MAX_DEPTH][MAX_NAME_LEN];
@@ -75,7 +80,7 @@ int path_resolve(const char *path, uint32_t base_inode, int follow_final_link,
     uint32_t parent = current;
 
     if (count == 0) {
-        // Caminho era "", "/" ou so barras: refere-se ao proprio `current`.
+        // Path is empty or just "/", return the current inode as both the resolved inode and parent.
         *out_inode = current;
         *out_parent = current;
         out_name[0] = '\0';
@@ -102,7 +107,7 @@ int path_resolve(const char *path, uint32_t base_inode, int follow_final_link,
 
         inode_t *cur = inode_get(current);
         if (cur->type != INODE_DIR) {
-            return -1; // tentando descer em algo que nao e um diretorio
+            return -1; // trying to descend into something that is not a directory
         }
 
         uint32_t child;
@@ -112,9 +117,9 @@ int path_resolve(const char *path, uint32_t base_inode, int follow_final_link,
                 *out_parent = current;
                 strncpy(out_name, comp, MAX_NAME_LEN - 1);
                 out_name[MAX_NAME_LEN - 1] = '\0';
-                return 0; // ultimo componente nao existe: quem chamou pode criar
+                return 0; // last component does not exist: caller can create it
             }
-            return -1; // componente intermediario ausente
+            return -1; // intermediate component missing
         }
 
         if (inode_get(child)->type == INODE_LINK && (!is_last || follow_final_link)) {
@@ -135,6 +140,8 @@ int path_resolve(const char *path, uint32_t base_inode, int follow_final_link,
     return 0;
 }
 
+// Build the absolute path of `inode_idx` (e.g., "/a/b/c") into `out`.
+// The function traverses up the directory tree to construct the path, stopping at the root inode.
 void path_absolute(uint32_t inode_idx, char *out, size_t out_sz) {
     uint32_t root = disk_superblock()->root_inode;
     if (inode_idx == root) {

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+// Create a new directory at `path` relative to `cwd`. The new directory will be owned by `user`.
 int fs_mkdir(uint32_t cwd, const char *path, const char *user) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];
@@ -29,6 +30,7 @@ int fs_mkdir(uint32_t cwd, const char *path, const char *user) {
     return 0;
 }
 
+// Remove the directory at `path` relative to `cwd`. The directory must be empty.
 int fs_rmdir(uint32_t cwd, const char *path, const char *user) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];
@@ -61,24 +63,25 @@ int fs_rmdir(uint32_t cwd, const char *path, const char *user) {
     return 0;
 }
 
-// Callback usado por fs_ls() para imprimir uma linha por entrada de
-// diretorio, no estilo do `ls -l`.
+// List the contents of the directory at `path` relative to `cwd`. If `path` is empty, list the contents of `cwd`.
 static void print_entry(uint32_t child_idx, void *ctx) {
     (void)ctx;
     inode_t *inode = inode_get(child_idx);
     char type_char = (inode->type == INODE_DIR) ? 'd' : (inode->type == INODE_LINK ? 'l' : '-');
 
-    printf("%c%c%c%c%c%c%c %-10s %8u %s\n",
-           type_char,
-           (inode->perm_owner & PERM_READ) ? 'r' : '-',
-           (inode->perm_owner & PERM_WRITE) ? 'w' : '-',
-           (inode->perm_owner & PERM_EXEC) ? 'x' : '-',
-           (inode->perm_other & PERM_READ) ? 'r' : '-',
-           (inode->perm_other & PERM_WRITE) ? 'w' : '-',
-           (inode->perm_other & PERM_EXEC) ? 'x' : '-',
-           inode->owner, inode->size, inode->name);
+    printf("%s\n", inode->name);
+//     printf("%c%c%c%c%c%c%c %-10s %8u %s\n",
+//            type_char,
+//            (inode->perm_owner & PERM_READ) ? 'r' : '-',
+//            (inode->perm_owner & PERM_WRITE) ? 'w' : '-',
+//            (inode->perm_owner & PERM_EXEC) ? 'x' : '-',
+//            (inode->perm_other & PERM_READ) ? 'r' : '-',
+//            (inode->perm_other & PERM_WRITE) ? 'w' : '-',
+//            (inode->perm_other & PERM_EXEC) ? 'x' : '-',
+//            inode->owner, inode->size, inode->name);
 }
 
+// Solve `path` relative to `cwd` and change the current working directory to that path.
 int fs_ls(uint32_t cwd, const char *path, const char *user) {
     uint32_t target = cwd;
 
@@ -106,6 +109,8 @@ int fs_ls(uint32_t cwd, const char *path, const char *user) {
     return 0;
 }
 
+// Solve `path` relative to `cwd` and change the current working directory to that path.
+// The new working directory will be returned in `out_inode`.
 int fs_cd(uint32_t cwd, const char *path, const char *user, uint32_t *out_inode) {
     uint32_t inode_idx, parent_idx;
     char name[MAX_NAME_LEN];

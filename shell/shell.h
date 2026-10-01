@@ -1,7 +1,7 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-// Print the help message with the list of available commands.
-static void print_help(void);
+// Start the shell interface, allowing the user to interact with the filesystem.
+void shell_run(void);
 
 #endif

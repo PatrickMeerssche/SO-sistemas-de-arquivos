@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 
+// Find a directory entry named `name` in the directory represented by `dir_idx`.
 int dir_find_entry(uint32_t dir_idx, const char *name, uint32_t *out_child) {
     inode_t *dir = inode_get(dir_idx);
     uint32_t num_blocks = dir->size / BLOCK_SIZE;
@@ -27,11 +28,12 @@ int dir_find_entry(uint32_t dir_idx, const char *name, uint32_t *out_child) {
     return 0;
 }
 
+// Add a directory entry pointing to `child_idx` in the directory represented by `dir_idx`.
 int dir_add_entry(uint32_t dir_idx, uint32_t child_idx) {
     inode_t *dir = inode_get(dir_idx);
     uint32_t num_blocks = dir->size / BLOCK_SIZE;
 
-    // Primeiro, tenta reaproveitar uma posicao livre em um bloco ja alocado.
+    // First, try to find a free entry in the existing blocks.
     for (uint32_t b = 0; b < num_blocks; b++) {
         uint32_t blk = inode_get_block(dir, b, 0);
         dirent_t *entries = (dirent_t *)disk_block_ptr(blk);
@@ -44,10 +46,10 @@ int dir_add_entry(uint32_t dir_idx, uint32_t child_idx) {
         }
     }
 
-    // Nenhuma posicao livre encontrada: cresce o diretorio com mais um bloco.
+    // If no free entry was found, we need to allocate a new block for the directory.
     uint32_t blk = inode_get_block(dir, num_blocks, 1);
     if (blk == INVALID_BLOCK) {
-        return -1; // disco cheio
+        return -1; // Disk is full or cannot allocate a new block.
     }
     dir->size += BLOCK_SIZE;
 
@@ -57,6 +59,7 @@ int dir_add_entry(uint32_t dir_idx, uint32_t child_idx) {
     return 0;
 }
 
+// Remove the directory entry that points to `child_idx` from the directory represented by `dir_idx`.
 int dir_remove_entry(uint32_t dir_idx, uint32_t child_idx) {
     inode_t *dir = inode_get(dir_idx);
     uint32_t num_blocks = dir->size / BLOCK_SIZE;
@@ -72,9 +75,10 @@ int dir_remove_entry(uint32_t dir_idx, uint32_t child_idx) {
             }
         }
     }
-    return -1; // nao encontrada
+    return -1; // Entry not found
 }
 
+// Return 1 if the directory has no children, 0 otherwise.
 int dir_is_empty(uint32_t dir_idx) {
     inode_t *dir = inode_get(dir_idx);
     uint32_t num_blocks = dir->size / BLOCK_SIZE;
@@ -91,6 +95,7 @@ int dir_is_empty(uint32_t dir_idx) {
     return 1;
 }
 
+// Call cb(child_inode_idx, ctx) for each child entry in the directory represented by `dir_idx`.
 void dir_for_each(uint32_t dir_idx, dir_iter_cb cb, void *ctx) {
     inode_t *dir = inode_get(dir_idx);
     uint32_t num_blocks = dir->size / BLOCK_SIZE;
@@ -106,6 +111,7 @@ void dir_for_each(uint32_t dir_idx, dir_iter_cb cb, void *ctx) {
     }
 }
 
+// Allocate a new inode of type `type` named `name` within `parent_idx` and add it as a directory entry. Fill in owner/creator/permissions/timestamps. Return 0 on success. Negative error codes: -1 parent is not a directory, -2 permission denied, -3 name already exists, -4 no free inodes, -5 disk full when growing the parent directory.
 int dir_create_child(uint32_t parent_idx, const char *name, uint8_t type,
                       const char *user, uint32_t *out_idx) {
     inode_t *parent = inode_get(parent_idx);
@@ -134,15 +140,14 @@ int dir_create_child(uint32_t parent_idx, const char *name, uint8_t type,
     inode->created_at = time(NULL);
     inode->modified_at = inode->created_at;
 
-    // Todo filho lembra seu diretorio pai: necessario para o ".." e para
-    // resolver alvos relativos de symlink, nao apenas para o cd em diretorios.
+    // Every parent directory should have a reference to its child, and every child should have a reference to its parent. 
     inode->parent_inode = (int32_t)parent_idx;
 
     if (type == INODE_DIR) {
         inode->perm_owner = PERM_READ | PERM_WRITE | PERM_EXEC;
         inode->perm_other = PERM_READ | PERM_EXEC;
     } else {
-        // arquivos comuns e symlinks: leitura e escrita para o dono, so leitura para os demais
+        // For files and other types, set default permissions (read/write for owner, read for others).
         inode->perm_owner = PERM_READ | PERM_WRITE;
         inode->perm_other = PERM_READ;
     }
